@@ -1,0 +1,431 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset='utf-8'>
+  <meta http-equiv='X-UA-Compatible' content='IE=edge'>
+  <title>Page Title</title>
+  <meta name='viewport' content='width=device-width, initial-scale=1'>
+  <link rel='stylesheet' type='text/css' media='screen' href='main.css'>
+  <script src='main.js'></script>
+  <style>
+      #left{
+        width: 100px;
+        height: 100px;
+        float: left;
+        
+      }
+      #right{
+        width: 100px;
+        height: 100px;
+        float: right;
+      }
+      #centre{
+        width: 100px;
+        height: 100px;
+        margin: auto;
+      }
+      * {
+        margin: 0px;
+        padding: 0px;
+    }
+
+    .cargame {
+        background: #0abde3;
+    }
+
+    .hide {
+        display: none;
+    }
+
+    .car {
+        width: 60px;
+        height: 85px;
+        background: red;
+        border-radius: 8px;
+        position: absolute;
+        bottom: 100px;
+
+    }
+
+    .gamearea {
+        width: 400px;
+        height: 100vh;
+        margin: auto;
+        background: #2f3640;
+        position: relative;
+        overflow: hidden;
+        border-left: 7px dashed white;
+        border-right: 7px dashed white;
+
+    }
+
+    .lines {
+        width: 10px;
+        height: 100px;
+        background: white;
+        margin-left: 195px;
+        position: absolute;
+    }
+
+    .enemy {
+        width: 60px;
+        height: 85px;
+        border-radius: 8px;
+        background: red;
+        position: absolute;
+        bottom: 100px;
+
+    }
+
+    /* .score {
+        position: absolute;
+        top: 15px;
+        left: 40px;
+        background: #40739e;
+        width: 300px;
+        line-height: 70px;
+        text-align: center;
+        color: white;
+        font-size: 1.5rem;
+        font-family: fantasy;
+        box-shadow: 0px 5px 5px #777;
+    } */
+
+    .startscreen {
+        position: absolute;
+        background-color: #8395a7;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        color: white;
+        z-index: 1;
+        text-align: center;
+        border: 2px solid #222f3e;
+        border-radius: 8px;
+        padding: 15px;
+        margin: auto;
+        width: 50%;
+        cursor: pointer;
+        letter-spacing: 5;
+        word-spacing: 3;
+        font-size: 20px;
+        line-height: 30px;
+        text-transform: uppercase;
+        box-shadow: 0px 5px 5px #777;
+
+    }
+  </style>
+</head>
+<body>
+    <div id="left"></div>
+    <div id="right"></div>
+    <div id="centre"></div>
+    
+<button type="button" onclick="init()">Start</button>
+<div><canvas id="canvas"></canvas></div>
+<div id="label-container"></div>
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@1.3.1/dist/tf.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@teachablemachine/pose@0.8/dist/teachablemachine-pose.min.js"></script>
+<script type="text/javascript">
+    // More API functions here:
+    // https://github.com/googlecreativelab/teachablemachine-community/tree/master/libraries/pose
+
+    // the link to your model provided by Teachable Machine export panel
+    const URL = "https://teachablemachine.withgoogle.com/models/91q_Ul3Gj/" //head
+    // const URL = "https://teachablemachine.withgoogle.com/models/8s7mCPX6U/" //hand
+    //"https://teachablemachine.withgoogle.com/models/91q_Ul3Gj/";
+    let model, webcam, ctx, labelContainer, maxPredictions;
+
+    async function init() {
+        const modelURL = URL + "model.json";
+        const metadataURL = URL + "metadata.json";
+
+        // load the model and metadata
+        // Refer to tmImage.loadFromFiles() in the API to support files from a file picker
+        // Note: the pose library adds a tmPose object to your window (window.tmPose)
+        model = await tmPose.load(modelURL, metadataURL);
+        maxPredictions = model.getTotalClasses();
+
+        // Convenience function to setup a webcam
+        const size = 200;
+        const flip = true; // whether to flip the webcam
+        webcam = new tmPose.Webcam(size, size, flip); // width, height, flip
+        await webcam.setup(); // request access to the webcam
+        await webcam.play();
+        window.requestAnimationFrame(loop);
+
+        // append/get elements to the DOM
+        const canvas = document.getElementById("canvas");
+        canvas.width = size; canvas.height = size;
+        ctx = canvas.getContext("2d");
+        labelContainer = document.getElementById("label-container");
+        for (let i = 0; i < maxPredictions; i++) { // and class labels
+            labelContainer.appendChild(document.createElement("div"));
+        }
+    }
+
+    async function loop(timestamp) {
+        webcam.update(); // update the webcam frame
+        await predict();
+        window.requestAnimationFrame(loop);
+    }
+
+    async function predict() {
+        // Prediction #1: run input through posenet
+        // estimatePose can take in an image, video or canvas html element
+        const { pose, posenetOutput } = await model.estimatePose(webcam.canvas);
+        // Prediction 2: run input through teachable machine classification model
+        const prediction = await model.predict(posenetOutput);
+
+        for (let i = 0; i < maxPredictions; i++) {
+            const classPrediction =
+                prediction[i].className + ": " + prediction[i].probability.toFixed(2);
+                if(i==0){
+                    if(prediction[i].probability.toFixed(2)>0.50){
+                        keys.ArrowRight=false;
+                        keys.ArrowLeft=false;
+                        document.getElementById("centre").style.backgroundColor = "red";
+                        document.getElementById("right").style.backgroundColor = "white";
+                        document.getElementById("left").style.backgroundColor = "white";
+                    }
+                }
+                if(i==1){
+                    if(prediction[i].probability.toFixed(2)>0.80){
+                        keys.ArrowRight=true;
+                        document.getElementById("centre").style.backgroundColor = "white";
+                        document.getElementById("right").style.backgroundColor = "red";
+                        document.getElementById("left").style.backgroundColor = "white";
+                    }
+                }
+                if(i==2){
+                    if(prediction[i].probability.toFixed(2)>0.80){
+                        keys.ArrowLeft=true;
+                        document.getElementById("centre").style.backgroundColor = "white";
+                        document.getElementById("right").style.backgroundColor = "white";
+                        document.getElementById("left").style.backgroundColor = "red";
+                    }
+                }
+            labelContainer.childNodes[i].innerHTML = classPrediction;
+        }
+
+        // finally draw the poses
+        drawPose(pose);
+    }
+
+    function drawPose(pose) {
+        if (webcam.canvas) {
+            ctx.drawImage(webcam.canvas, 0, 0);
+            // draw the keypoints and skeleton
+            if (pose) {
+                const minPartConfidence = 0.5;
+                tmPose.drawKeypoints(pose.keypoints, minPartConfidence, ctx);
+                tmPose.drawSkeleton(pose.keypoints, minPartConfidence, ctx);
+            }
+        }
+    }
+</script>
+<div class="cargame">
+    <div class="score"></div>
+    <div class="startscreen">
+        <p> Tap to start.</br>
+            arrow keys to move.</br>
+            if you hit any cube you will die.</br>
+        </p>
+    </div>
+    <div class="gamearea"> </div>
+</div>
+</body>
+<script>
+    const score = document.querySelector('.score');
+    const startscreen = document.querySelector('.startscreen');
+    const gamearea = document.querySelector('.gamearea');
+
+    startscreen.addEventListener('click', start);
+
+    let keys = { ArrowUp: false, ArrowDown: false, ArrowRight: false, ArrowLeft: false };
+    let player = { speed: 4, score: 0 };
+
+    document.addEventListener('keydown', keydown);
+    document.addEventListener('keyup', keyup);
+
+    function keydown(e) {
+        e.preventDefault();
+        keys[e.key] = true;
+        // console.log(keys);
+    }
+
+    function keyup(e) {
+        e.preventDefault();
+        keys[e.key] = false;
+        // console.log(e.key);
+    }
+
+    function start() {
+        //gamearea.classList.remove('hide');
+        startscreen.classList.add('hide');
+        gamearea.innerHTML = "";
+        player.start = true;
+        player.speed = 4;
+        player.score = 0;
+        window.requestAnimationFrame(gameplay);
+
+
+
+
+        for (i = 0; i < 6; i++) {
+            let roadLine = document.createElement('div');
+            roadLine.setAttribute('class', 'lines');
+            roadLine.y = (i * 150);
+            roadLine.style.top = roadLine.y + "px";
+            gamearea.appendChild(roadLine);
+        }
+
+        let car = document.createElement('div');
+        car.setAttribute('class', 'car');
+        // car.innerText='Hey its rolls royce';
+        gamearea.appendChild(car);
+
+        player.x = car.offsetLeft;
+        player.y = car.offsetTop;
+
+        console.log(car.offsetTop);
+        console.log(car.offsetLeft);
+
+        for (i = 0; i < 3; i++) {
+            let enemyCar = document.createElement('div');
+            enemyCar.setAttribute('class', 'enemy');
+            enemyCar.y = ((i + 1) * 350) * -1;
+            enemyCar.style.top = enemyCar.y + "px";
+            enemyCar.style.background = randomColor();
+            enemyCar.style.left = Math.floor(Math.random() * 350) + 'px';
+            gamearea.appendChild(enemyCar);
+        }
+    }
+
+    function gameplay() {
+        let car = document.querySelector('.car');
+        let road = gamearea.getBoundingClientRect();
+        // console.log(road);
+        if (player.start) {
+            moveLines();
+            moveEnemy(car);
+
+            if (keys.ArrowUp && player.y > (road.top + 80)) {
+                player.y -= player.speed;
+            }
+            if (keys.ArrowDown && player.y < (road.bottom - 90)) {
+                player.y += player.speed;
+            }
+            if (keys.ArrowLeft && player.x > 0) {
+                player.x -= (player.speed+3);
+            }
+            if (keys.ArrowRight && player.x < (road.width - 78)) {
+                player.x += (player.speed+3);
+            }
+            // if (player.score > 500) {
+            //     player.speed = 8;
+            // }
+            // if (player.score > 800) {
+            //     player.speed = 9;
+            // }
+            // if (player.score > 1500) {
+            //     player.speed = 11;
+            // }
+            // if (player.score > 2100) {
+            //     player.speed = 13;
+            // }
+            // if (player.score > 3000) {
+            //     player.speed = 15;
+            // }
+            // if (player.score > 3700) {
+            //     player.speed = 17;
+            // }
+            // if (player.score > 4700) {
+            //     player.speed = 19;
+            // }
+            // if (player.score > 5700) {
+            //     player.speed = 21;
+            // }
+
+
+            car.style.top = player.y + "px"
+            car.style.left = player.x + "px"
+            
+            window.requestAnimationFrame(gameplay);
+            console.log(player.score++);
+
+            player.score++;
+            let ps = player.score - 2;
+            score.innerHTML = "Score: " + ps;
+        }
+
+    }
+
+    function moveLines() {
+
+        let lines = document.querySelectorAll('.lines');
+
+        lines.forEach(function (item) {
+
+            if (item.y >= 700) {
+                item.y -= 750
+            }
+
+            item.y += player.speed;
+            item.style.top = item.y + "px";
+        })
+    }
+
+    function moveEnemy(car) {
+
+        let enemy = document.querySelectorAll('.enemy');
+
+        enemy.forEach(function (item) {
+
+            if (isCollide(car, item)) {
+                console.log("Game over!");
+                endGame();
+                startscreen.classList.remove('hide');
+            }
+
+            if (item.y >= 750) {
+                item.y = -300
+                item.style.left = Math.floor(Math.random() * 350) + "px";
+            }
+
+            item.y += player.speed;
+            item.style.top = item.y + "px";
+        })
+    }
+
+    function randomColor() {
+        function c() {
+
+            let hex = Math.floor(Math.random() * 256).toString(16);
+            return ("0" + String(hex)).substr(-2);
+        }
+
+        return "#" + c() + c() + c();
+    }
+
+    function isCollide(a, b) {
+        aRect = a.getBoundingClientRect();
+        bRect = b.getBoundingClientRect();
+
+        return !((aRect.bottom <= bRect.top) || (aRect.top >= bRect.bottom) ||
+            (aRect.right <= bRect.left) || (aRect.left >= bRect.right))
+    }
+
+    function endGame() {
+
+        player.start = false;
+        startscreen.innerHTML = 'Game over! <br>Final Score: ' + player.score + "<br> Tap to Restart"
+
+    }
+
+
+
+
+
+</script>
+</html>
